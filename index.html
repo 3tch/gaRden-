@@ -1,0 +1,390 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Garden</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- JSZip CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #7cff7c 0, #0b3d0b 40%, #021502 100%);
+      color: #e9ffe9;
+      cursor: none;
+    }
+    canvas#garden-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+    .bush-layer {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 10% 80%, #0f4d1a 0, transparent 55%),
+        radial-gradient(circle at 80% 90%, #0b5a1f 0, transparent 55%),
+        radial-gradient(circle at 30% 20%, #0a3f16 0, transparent 50%),
+        radial-gradient(circle at 70% 10%, #0f5f24 0, transparent 50%);
+      mix-blend-mode: soft-light;
+      opacity: 0.9;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .ui {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .panel {
+      background: rgba(3, 20, 6, 0.9);
+      border-radius: 24px;
+      padding: 24px 28px;
+      max-width: 420px;
+      width: 90%;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(180, 255, 180, 0.25);
+      backdrop-filter: blur(10px);
+    }
+    .panel h1 {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+    }
+    .panel p {
+      font-size: 0.9rem;
+      opacity: 0.85;
+      margin-bottom: 16px;
+    }
+    .field {
+      margin-bottom: 14px;
+    }
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.8;
+      margin-bottom: 4px;
+    }
+    .field input {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(200, 255, 200, 0.3);
+      background: rgba(2, 30, 8, 0.9);
+      color: #e9ffe9;
+      outline: none;
+      font-size: 0.9rem;
+    }
+    .field input:focus {
+      border-color: #7cff7c;
+      box-shadow: 0 0 0 1px rgba(124, 255, 124, 0.4);
+    }
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #7cff7c, #4cffc9);
+      color: #021502;
+      cursor: pointer;
+      transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, filter 0.08s ease-out;
+      box-shadow: 0 0 18px rgba(124, 255, 124, 0.4);
+    }
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+      box-shadow: 0 0 24px rgba(124, 255, 124, 0.6);
+    }
+    button:active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: 0 0 10px rgba(124, 255, 124, 0.4);
+    }
+    .hint {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+    .status {
+      font-size: 0.8rem;
+      margin-top: 8px;
+      min-height: 1em;
+      opacity: 0.85;
+    }
+    .status.ok {
+      color: #9dff9d;
+    }
+    .status.err {
+      color: #ffb3b3;
+    }
+    .cursor-blob {
+      position: fixed;
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      pointer-events: none;
+      z-index: 10;
+      mix-blend-mode: screen;
+      background: conic-gradient(from 0deg, #ff4, #f0f, #4ff, #ff4);
+      transform: translate(-50%, -50%);
+      transition: transform 0.06s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="garden-canvas"></canvas>
+  <div class="bush-layer"></div>
+
+  <div class="ui">
+    <div class="panel">
+      <h1>Garden</h1>
+      <p>Throw a link into the bush. If you know the code, the garden will grow a DOCX that points to your URL.</p>
+
+      <div class="field">
+        <label for="code">Garden Code</label>
+        <input id="code" type="password" autocomplete="off" />
+        <div class="hint">Only the gardener knows it.</div>
+      </div>
+      <button id="unlock-btn">Unlock</button>
+
+      <div id="unlocked-section" style="margin-top:16px; display:none;">
+        <div class="field">
+          <label for="url">URL to throw into the bush</label>
+          <input id="url" type="text" placeholder="https://example.com" />
+        </div>
+        <button id="grow-btn">Grow DOCX</button>
+      </div>
+
+      <div id="status" class="status"></div>
+    </div>
+  </div>
+
+  <div id="cursor-blob" class="cursor-blob"></div>
+
+  <script>
+    // ===== CONFIG =====
+    const SECRET = "mehd62(#&*bshej8sa163)dk)7ummNvF)(t77gnT3K*";
+
+    // ===== CURSOR BLOB =====
+    (function setupCursorBlob() {
+      const blob = document.getElementById("cursor-blob");
+      let x = window.innerWidth / 2;
+      let y = window.innerHeight / 2;
+      let targetX = x;
+      let targetY = y;
+      let hue = 0;
+
+      window.addEventListener("mousemove", (e) => {
+        targetX = e.clientX;
+        targetY = e.clientY;
+      });
+
+      function animate() {
+        x += (targetX - x) * 0.25;
+        y += (targetY - y) * 0.25;
+        hue = (hue + 1) % 360;
+        blob.style.left = x + "px";
+        blob.style.top = y + "px";
+        blob.style.background = `radial-gradient(circle at 30% 30%, hsl(${hue},100%,70%), transparent 60%), radial-gradient(circle at 70% 70%, hsl(${(hue+120)%360},100%,70%), transparent 60%)`;
+        requestAnimationFrame(animate);
+      }
+      animate();
+    })();
+
+    // ===== PARTICLES =====
+    (function setupParticles() {
+      const canvas = document.getElementById("garden-canvas");
+      const ctx = canvas.getContext("2d");
+      let w = canvas.width = window.innerWidth;
+      let h = canvas.height = window.innerHeight;
+
+      window.addEventListener("resize", () => {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+      });
+
+      const particles = [];
+      const COUNT = 80;
+
+      function rand(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      for (let i = 0; i < COUNT; i++) {
+        particles.push({
+          x: rand(0, w),
+          y: rand(0, h),
+          vx: rand(-0.3, 0.3),
+          vy: rand(-0.3, 0.3),
+          r: rand(2, 5),
+          hue: rand(0, 360)
+        });
+      }
+
+      function step() {
+        ctx.clearRect(0, 0, w, h);
+        ctx.globalCompositeOperation = "lighter";
+
+        for (const p of particles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.hue = (p.hue + 0.2) % 360;
+
+          if (p.x < -50) p.x = w + 50;
+          if (p.x > w + 50) p.x = -50;
+          if (p.y < -50) p.y = h + 50;
+          if (p.y > h + 50) p.y = -50;
+
+          const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 4);
+          grd.addColorStop(0, `hsla(${p.hue}, 100%, 70%, 0.9)`);
+          grd.addColorStop(1, "rgba(0,0,0,0)");
+
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        requestAnimationFrame(step);
+      }
+      step();
+    })();
+
+    // ===== DOCX GENERATION FROM SCRATCH =====
+    async function generateDocxWithUrl(url) {
+      const zip = new JSZip();
+
+      const contentTypesXml = `
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+`.trim();
+
+      const relsRootXml = `
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+`.trim();
+
+      const documentXml = `
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:t>Garden link: </w:t>
+      </w:r>
+      <w:hyperlink r:id="rId2">
+        <w:r>
+          <w:rPr>
+            <w:rStyle w:val="Hyperlink"/>
+          </w:rPr>
+          <w:t>Click here</w:t>
+        </w:r>
+      </w:hyperlink>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>
+`.trim();
+
+      const docRelsXml = `
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId2"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+    Target="${url}"
+    TargetMode="External"/>
+</Relationships>
+`.trim();
+
+      zip.file("[Content_Types].xml", contentTypesXml);
+      zip.folder("_rels").file(".rels", relsRootXml);
+      const wordFolder = zip.folder("word");
+      wordFolder.file("document.xml", documentXml);
+      wordFolder.folder("_rels").file("document.xml.rels", docRelsXml);
+
+      const outUint8 = await zip.generateAsync({ type: "uint8array" });
+      return outUint8;
+    }
+
+    function downloadUint8AsDocx(uint8, filename) {
+      const blob = new Blob([uint8], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ===== UI LOGIC =====
+    (function setupUI() {
+      const codeInput = document.getElementById("code");
+      const unlockBtn = document.getElementById("unlock-btn");
+      const unlockedSection = document.getElementById("unlocked-section");
+      const urlInput = document.getElementById("url");
+      const growBtn = document.getElementById("grow-btn");
+      const statusEl = document.getElementById("status");
+
+      function setStatus(msg, type = "") {
+        statusEl.textContent = msg;
+        statusEl.className = "status " + (type || "");
+      }
+
+      unlockBtn.addEventListener("click", () => {
+        const val = codeInput.value.trim();
+        if (val === SECRET) {
+          unlockedSection.style.display = "block";
+          setStatus("The bush parts. The garden listens.", "ok");
+        } else {
+          setStatus("The garden stays silent. Wrong code.", "err");
+        }
+      });
+
+      growBtn.addEventListener("click", async () => {
+        const url = urlInput.value.trim();
+        if (!url) {
+          setStatus("You must give the garden a URL.", "err");
+          return;
+        }
+        if (!/^https?:\/\//i.test(url)) {
+          setStatus("Use a full URL starting with http:// or https://", "err");
+          return;
+        }
+
+        try {
+          setStatus("The bush is weaving a DOCX...", "ok");
+          const docxBytes = await generateDocxWithUrl(url);
+          downloadUint8AsDocx(docxBytes, "garden-link.docx");
+          setStatus("The garden hands you a DOCX.", "ok");
+        } catch (err) {
+          console.error(err);
+          setStatus("The garden rustles in confusion: " + err.message, "err");
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
